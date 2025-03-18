@@ -88,7 +88,7 @@ if st.session_state.df is not None:
     categorical_columns = st.session_state.categorical_columns
     
     # Data exploration tab
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Data Preview", "Basic Statistics", "Visualizations", "Advanced Analysis", "Custom Plots", "AI Analysis", "Export"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Data Preview", "Basic Statistics", "Visualizations", "Advanced Analysis", "Custom Plots", "AI Analysis", "Export"])
     
     with tab1:
         st.header("Data Preview")
