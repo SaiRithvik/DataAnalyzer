@@ -194,3 +194,30 @@ def generate_data_profile(df):
         profile['Column Details'].append(col_profile)
     
     return profile
+def generate_data_profile(df):
+    """Generate a comprehensive data profile."""
+    profile = {
+        'Shape': df.shape,
+        'Memory Usage': f"{df.memory_usage().sum() / 1024 / 1024:.2f} MB",
+        'Duplicate Rows': df.duplicated().sum(),
+        'Column Types': df.dtypes.value_counts().to_dict(),
+        'Column Details': []
+    }
+    
+    for col in df.columns:
+        col_profile = {
+            'name': col,
+            'type': str(df[col].dtype),
+            'missing': df[col].isnull().sum(),
+            'unique_values': df[col].nunique()
+        }
+        if df[col].dtype in ['int64', 'float64']:
+            col_profile.update({
+                'mean': df[col].mean(),
+                'std': df[col].std(),
+                'min': df[col].min(),
+                'max': df[col].max()
+            })
+        profile['Column Details'].append(col_profile)
+    
+    return profile
