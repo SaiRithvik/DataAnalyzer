@@ -33,8 +33,36 @@ from ai_analysis import analyze_dataset_with_gpt
 st.set_page_config(
     page_title="Data Analyzer",
     page_icon="📊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# Dark theme
+st.markdown("""
+    <style>
+    .main {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
+    .stButton>button {
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 5px;
+        border: none;
+        padding: 10px 24px;
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #45a049;
+        transform: translateY(-2px);
+    }
+    .css-1d391kg {
+        padding: 1rem;
+        border-radius: 10px;
+        background-color: #1e2329;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Initialize session state variables
 if 'df' not in st.session_state:
@@ -87,7 +115,9 @@ if st.session_state.df is not None:
     categorical_columns = st.session_state.categorical_columns
     
     # Data exploration tab
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Data Preview", "Basic Statistics", "Visualizations", "Advanced Analysis", "Custom Plots", "AI Analysis", "Export"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["Data Preview", "Data Profile", "Basic Statistics", "Visualizations", "Advanced Analysis", "Custom Plots", "AI Analysis", "Export"])
+    
+    with tab1:
     
     with tab1:
         st.header("Data Preview")
@@ -117,6 +147,31 @@ if st.session_state.df is not None:
             
             # Sorting
             sort_column = st.selectbox("Sort by", ["None"] + selected_columns)
+
+    with tab2:
+        st.header("Data Profile")
+        if st.session_state.df is not None:
+            profile = generate_data_profile(df)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Rows", profile['Shape'][0])
+            with col2:
+                st.metric("Total Columns", profile['Shape'][1])
+            with col3:
+                st.metric("Memory Usage", profile['Memory Usage'])
+            
+            st.subheader("Column Details")
+            for col_profile in profile['Column Details']:
+                with st.expander(f"{col_profile['name']} ({col_profile['type']})"):
+                    st.write(f"Missing Values: {col_profile['missing']}")
+                    st.write(f"Unique Values: {col_profile['unique_values']}")
+                    if 'mean' in col_profile:
+                        st.write(f"Mean: {col_profile['mean']:.2f}")
+                        st.write(f"Std Dev: {col_profile['std']:.2f}")
+                        st.write(f"Range: [{col_profile['min']:.2f}, {col_profile['max']:.2f}]")
+
+
             if sort_column != "None":
                 sort_order = st.radio("Sort order", ["Ascending", "Descending"])
                 ascending = sort_order == "Ascending"
