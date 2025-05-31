@@ -56,6 +56,21 @@ st.write("Upload a CSV or Excel file to analyze your data")
 # File upload
 uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx"])
 
+# Server file selection
+st.subheader("Or select a file from the server")
+UPLOAD_DIR = "uploads"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+files = os.listdir(UPLOAD_DIR)
+if files:
+    selected_file = st.selectbox("Select a file for analysis", files)
+    if selected_file:
+        file_path = os.path.join(UPLOAD_DIR, selected_file)
+        st.write(f"Selected file: {file_path}")
+        # Use file_path for your analysis
+else:
+    st.write("No files found in the 'uploads' directory.")
+
 # Process the uploaded file
 if uploaded_file is not None:
     try:
