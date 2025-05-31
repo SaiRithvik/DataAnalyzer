@@ -75,7 +75,7 @@ if files:
             # Read the file with explicit index handling
             if selected_file.endswith('.csv'):
                 st.write("Reading CSV file...")
-                df = pd.read_csv(file_path, index_col=None)
+                df = pd.read_csv(file_path, index_col=None, low_memory=False)
             elif selected_file.endswith(('.xlsx', '.xls')):
                 st.write("Reading Excel file...")
                 df = pd.read_excel(file_path, index_col=None)
@@ -84,38 +84,18 @@ if files:
                 df = None
 
             if df is not None:
-                # Debug: Print initial DataFrame info
-                st.write("Initial DataFrame Info:")
-                st.write(f"Shape: {df.shape}")
-                st.write("Columns and their types:")
-                for col in df.columns:
-                    st.write(f"Column: {col}, Type: {df[col].dtype}")
-                    # Print sample values for object columns
-                    if df[col].dtype == 'object':
-                        st.write(f"Sample values for {col}:")
-                        st.write(df[col].head().tolist())
-                
-                # Reset index to ensure no problematic index
+                # Reset index
                 df = df.reset_index(drop=True)
                 
                 # Convert all object columns to string
                 st.write("\nConverting object columns to string...")
                 for col in df.select_dtypes(include=['object']).columns:
-                    st.write(f"Converting column: {col}")
                     try:
-                        # Print unique values before conversion
-                        st.write(f"Unique values in {col} before conversion:")
-                        st.write(df[col].unique()[:5])  # Show first 5 unique values
-                        
                         df[col] = df[col].fillna('').astype(str)
-                        
-                        # Print unique values after conversion
-                        st.write(f"Unique values in {col} after conversion:")
-                        st.write(df[col].unique()[:5])  # Show first 5 unique values
                     except Exception as e:
                         st.error(f"Error converting column {col}: {str(e)}")
-                        st.write(f"Error type: {type(e).__name__}")
-                        st.write(f"Error message: {str(e)}")
+                        # Drop problematic column
+                        df = df.drop(columns=[col])
                 
                 # Store in session state
                 st.session_state.df = df
@@ -128,17 +108,14 @@ if files:
                 
                 st.success(f"Successfully loaded {selected_file} with {df.shape[0]} rows and {df.shape[1]} columns.")
                 
-                # Final DataFrame info
-                st.write("\nFinal DataFrame Info:")
-                st.write("Data Types:")
-                st.write(df.dtypes)
+                # Display the dataframe using the safe display function
+                safe_display_dataframe(df)
                 
         except Exception as e:
             st.error(f"Error loading the file: {str(e)}")
             st.write("Detailed error information:")
             st.write(f"Error type: {type(e).__name__}")
             st.write(f"Error message: {str(e)}")
-            # Print the full traceback
             import traceback
             st.write("Full traceback:")
             st.write(traceback.format_exc())
@@ -147,38 +124,25 @@ else:
 
 def safe_display_dataframe(df):
     try:
-        # Create a copy of the dataframe to avoid modifying the original
+        # Create a copy of the dataframe
         display_df = df.copy()
         
-        # Print column types for debugging
-        st.write("Column types before conversion:")
-        st.write(display_df.dtypes)
+        # Debug information
+        st.write("DataFrame Info:")
+        st.write(f"Shape: {display_df.shape}")
+        st.write("Columns:", display_df.columns.tolist())
         
-        # Convert all object columns to string and handle missing values
-        for col in display_df.select_dtypes(include=['object']).columns:
-            try:
-                # Replace NaN with empty string
-                display_df[col] = display_df[col].fillna('')
-                # Convert to string
-                display_df[col] = display_df[col].astype(str)
-                # Remove any problematic characters
-                display_df[col] = display_df[col].str.replace('\x00', '')
-            except Exception as e:
-                st.error(f"Error converting column {col}: {str(e)}")
-                # If conversion fails, drop the problematic column
-                display_df = display_df.drop(columns=[col])
+        # Try to display using st.table instead of st.dataframe
+        st.table(display_df.head())
         
-        # Print column types after conversion
-        st.write("Column types after conversion:")
-        st.write(display_df.dtypes)
-        
-        # Try to display with use_container_width=True
-        st.dataframe(display_df, use_container_width=True)
-        
+        # If that works, try to display the full dataframe
+        if st.checkbox("Show full dataframe"):
+            st.table(display_df)
+            
     except Exception as e:
         st.error(f"Error displaying dataframe: {str(e)}")
-        # Fallback: display only the first few rows using pandas display
-        st.write("Displaying first 5 rows of the data:")
+        # Fallback: display as HTML
+        st.write("Displaying as HTML:")
         st.write(display_df.head().to_html(), unsafe_allow_html=True)
 
 # Show analysis options only if data is loaded
