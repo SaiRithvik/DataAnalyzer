@@ -85,6 +85,15 @@ if files:
                 st.session_state.numeric_columns = numeric_cols
                 st.session_state.categorical_columns = categorical_cols
                 st.success(f"Successfully loaded {selected_file} with {df.shape[0]} rows and {df.shape[1]} columns.")
+
+                def convert_object_column(df, column_name):
+                    # Convert the column to a string type
+                    df[column_name] = df[column_name].astype(str)
+                    return df
+
+                # Apply the conversion to the problematic column
+                if 'Data Type' in df.columns:
+                    df = convert_object_column(df, 'Data Type')
         except Exception as e:
             st.error(f"Error loading the file: {str(e)}")
 else:
