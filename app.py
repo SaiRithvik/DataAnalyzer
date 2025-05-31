@@ -29,114 +29,6 @@ from utils import (
 )
 from ai_analysis import analyze_dataset_with_gpt
 
-# Set page config
-st.set_page_config(
-    page_title="Data Analyzer",
-    page_icon="📊",
-    layout="wide"
-)
-
-
-# Initialize session state variables
-if 'df' not in st.session_state:
-    st.session_state.df = None
-if 'file_name' not in st.session_state:
-    st.session_state.file_name = None
-if 'numeric_columns' not in st.session_state:
-    st.session_state.numeric_columns = []
-if 'categorical_columns' not in st.session_state:
-    st.session_state.categorical_columns = []
-if 'ai_insights' not in st.session_state:
-    st.session_state.ai_insights = None
-
-# Header
-st.title("📊 Data Analyzer")
-st.write("Upload a CSV or Excel file to analyze your data")
-
-# File upload
-uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx"])
-
-# Server file selection
-st.subheader("Or select a file from the server")
-UPLOAD_DIR = "uploads"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
-files = os.listdir(UPLOAD_DIR)
-if files:
-    selected_file = st.selectbox("Select a file for analysis", files)
-    if selected_file:
-        file_path = os.path.join(UPLOAD_DIR, selected_file)
-        st.write(f"Selected file: {file_path}")
-        try:
-            # Debug: Print file size
-            file_size = os.path.getsize(file_path) / (1024 * 1024)  # Convert to MB
-            st.write(f"File size: {file_size:.2f} MB")
-            
-            # Read the file with explicit index handling
-            if selected_file.endswith('.csv'):
-                st.write("Reading CSV file...")
-                # Read in chunks
-                chunk_size = 10000  # Adjust this value based on your needs
-                chunks = pd.read_csv(file_path, chunksize=chunk_size, low_memory=False)
-                
-                # Process first chunk to get column information
-                first_chunk = next(chunks)
-                df = first_chunk
-                
-                # Convert object columns to string in the first chunk
-                for col in df.select_dtypes(include=['object']).columns:
-                    df[col] = df[col].fillna('').astype(str)
-                
-                # Store in session state
-                st.session_state.df = df
-                st.session_state.file_name = selected_file
-                st.session_state.chunks = chunks  # Store the chunk iterator
-                
-                # Get column types
-                numeric_cols, categorical_cols = get_data_types(df)
-                st.session_state.numeric_columns = numeric_cols
-                st.session_state.categorical_columns = categorical_cols
-                
-                st.success(f"Successfully loaded first chunk of {selected_file}")
-                
-                # Display the dataframe using the safe display function
-                safe_display_dataframe(df)
-                
-            elif selected_file.endswith(('.xlsx', '.xls')):
-                st.write("Reading Excel file...")
-                df = pd.read_excel(file_path, index_col=None)
-                
-                # Convert object columns to string
-                for col in df.select_dtypes(include=['object']).columns:
-                    df[col] = df[col].fillna('').astype(str)
-                
-                # Store in session state
-                st.session_state.df = df
-                st.session_state.file_name = selected_file
-                
-                # Get column types
-                numeric_cols, categorical_cols = get_data_types(df)
-                st.session_state.numeric_columns = numeric_cols
-                st.session_state.categorical_columns = categorical_cols
-                
-                st.success(f"Successfully loaded {selected_file}")
-                
-                # Display the dataframe using the safe display function
-                safe_display_dataframe(df)
-            else:
-                st.error("Unsupported file format. Please upload a CSV or Excel file.")
-                
-        except Exception as e:
-            st.error(f"Error loading the file: {str(e)}")
-            st.write("Detailed error information:")
-            st.write(f"Error type: {type(e).__name__}")
-            st.write(f"Error message: {str(e)}")
-            import traceback
-            st.write("Full traceback:")
-            st.write(traceback.format_exc())
-else:
-    st.write("No files found in the 'uploads' directory.")
-
 def safe_display_dataframe(df):
     try:
         # Create a copy of the dataframe
@@ -182,6 +74,118 @@ def safe_display_dataframe(df):
     except Exception as e:
         st.error(f"Error displaying dataframe: {str(e)}")
         st.write("Error details:", str(e))
+
+def display_large_dataframe(df, chunk_size=1000):
+    """Display a large dataframe in chunks with basic information"""
+    try:
+        # Basic information
+        st.write(f"Total rows: {len(df)}")
+        st.write(f"Total columns: {len(df.columns)}")
+        st.write("Columns:", df.columns.tolist())
+        
+        # Display in chunks
+        total_chunks = (len(df) + chunk_size - 1) // chunk_size
+        chunk = st.selectbox(
+            "Select chunk to view",
+            range(total_chunks),
+            format_func=lambda x: f"Chunk {x+1} (rows {x*chunk_size+1}-{min((x+1)*chunk_size, len(df))})"
+        )
+        
+        # Get the selected chunk
+        start_idx = chunk * chunk_size
+        end_idx = min((chunk + 1) * chunk_size, len(df))
+        chunk_df = df.iloc[start_idx:end_idx]
+        
+        # Display as HTML table
+        st.write(chunk_df.to_html(), unsafe_allow_html=True)
+        
+        # Download option
+        if st.button("Download current chunk"):
+            csv = chunk_df.to_csv(index=False)
+            st.download_button(
+                label="Click to download",
+                data=csv,
+                file_name=f"chunk_{chunk+1}.csv",
+                mime="text/csv"
+            )
+            
+    except Exception as e:
+        st.error(f"Error displaying data: {str(e)}")
+
+# Set page config
+st.set_page_config(
+    page_title="Data Analyzer",
+    page_icon="📊",
+    layout="wide"
+)
+
+# Initialize session state variables
+if 'df' not in st.session_state:
+    st.session_state.df = None
+if 'file_name' not in st.session_state:
+    st.session_state.file_name = None
+if 'numeric_columns' not in st.session_state:
+    st.session_state.numeric_columns = []
+if 'categorical_columns' not in st.session_state:
+    st.session_state.categorical_columns = []
+if 'ai_insights' not in st.session_state:
+    st.session_state.ai_insights = None
+if 'chunks' not in st.session_state:
+    st.session_state.chunks = None
+
+# Header
+st.title("📊 Data Analyzer")
+st.write("Upload a CSV or Excel file to analyze your data")
+
+# File upload
+uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx"])
+
+# Server file selection
+st.subheader("Or select a file from the server")
+UPLOAD_DIR = "uploads"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+files = os.listdir(UPLOAD_DIR)
+if files:
+    selected_file = st.selectbox("Select a file for analysis", files)
+    if selected_file:
+        file_path = os.path.join(UPLOAD_DIR, selected_file)
+        st.write(f"Selected file: {file_path}")
+        try:
+            # Show file size
+            file_size = os.path.getsize(file_path) / (1024 * 1024)
+            st.write(f"File size: {file_size:.2f} MB")
+            
+            # Read the file
+            if selected_file.endswith('.csv'):
+                st.write("Reading CSV file...")
+                # Read in chunks of 100,000 rows
+                chunk_size = 100000
+                chunks = pd.read_csv(file_path, chunksize=chunk_size, low_memory=False)
+                
+                # Get first chunk
+                first_chunk = next(chunks)
+                
+                # Store in session state
+                st.session_state.df = first_chunk
+                st.session_state.file_name = selected_file
+                st.session_state.chunks = chunks
+                
+                # Display the first chunk
+                display_large_dataframe(first_chunk)
+                
+            elif selected_file.endswith(('.xlsx', '.xls')):
+                st.write("Reading Excel file...")
+                df = pd.read_excel(file_path)
+                st.session_state.df = df
+                st.session_state.file_name = selected_file
+                display_large_dataframe(df)
+                
+        except Exception as e:
+            st.error(f"Error loading file: {str(e)}")
+            st.write("Error details:", str(e))
+else:
+    st.write("No files found in the 'uploads' directory.")
 
 # Show analysis options only if data is loaded
 if st.session_state.df is not None:
