@@ -306,7 +306,7 @@ if st.session_state.df is not None:
                 color_col = st.selectbox("Color by (optional)", ["None"] + categorical_columns)
                 if color_col != "None":
                     fig = px.scatter(
-                        df.to_pandas(),
+                        df,
                         x=x_col,
                         y=y_col,
                         color=color_col,
@@ -314,14 +314,14 @@ if st.session_state.df is not None:
                     )
                 else:
                     fig = px.scatter(
-                        df.to_pandas(),
+                        df,
                         x=x_col,
                         y=y_col,
                         title=f"Scatter Plot: {y_col} vs {x_col}"
                     )
             else:
                 fig = px.scatter(
-                    df.to_pandas(),
+                    df,
                     x=x_col,
                     y=y_col,
                     title=f"Scatter Plot: {y_col} vs {x_col}"
