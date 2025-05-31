@@ -101,17 +101,39 @@ else:
 
 def safe_display_dataframe(df):
     try:
-        # First try to convert all object columns to string
-        for col in df.select_dtypes(include=['object']).columns:
-            df[col] = df[col].fillna('').astype(str)
+        # Create a copy of the dataframe to avoid modifying the original
+        display_df = df.copy()
+        
+        # Print column types for debugging
+        st.write("Column types before conversion:")
+        st.write(display_df.dtypes)
+        
+        # Convert all object columns to string and handle missing values
+        for col in display_df.select_dtypes(include=['object']).columns:
+            try:
+                # Replace NaN with empty string
+                display_df[col] = display_df[col].fillna('')
+                # Convert to string
+                display_df[col] = display_df[col].astype(str)
+                # Remove any problematic characters
+                display_df[col] = display_df[col].str.replace('\x00', '')
+            except Exception as e:
+                st.error(f"Error converting column {col}: {str(e)}")
+                # If conversion fails, drop the problematic column
+                display_df = display_df.drop(columns=[col])
+        
+        # Print column types after conversion
+        st.write("Column types after conversion:")
+        st.write(display_df.dtypes)
         
         # Try to display with use_container_width=True
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(display_df, use_container_width=True)
+        
     except Exception as e:
         st.error(f"Error displaying dataframe: {str(e)}")
-        # Fallback: display only the first few rows
+        # Fallback: display only the first few rows using pandas display
         st.write("Displaying first 5 rows of the data:")
-        st.write(df.head())
+        st.write(display_df.head().to_html(), unsafe_allow_html=True)
 
 # Show analysis options only if data is loaded
 if st.session_state.df is not None:
