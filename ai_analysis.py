@@ -23,7 +23,7 @@ def analyze_dataset_with_gpt(df, api_key, max_rows=100, max_cols=20):
     # Limit columns if too many
     if len(df.columns) > max_cols:
         sample_df = sample_df.iloc[:, :max_cols]
-    
+    #
     # Get basic stats
     numeric_cols = sample_df.select_dtypes(include=['number']).columns.tolist()
     stats = {}
