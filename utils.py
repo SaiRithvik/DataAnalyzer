@@ -1,4 +1,4 @@
-import pandas as pd
+import polars as pl
 import numpy as np
 import io
 
@@ -7,7 +7,7 @@ def get_data_types(df):
     Categorize columns into numeric and categorical types.
     
     Args:
-        df: Pandas DataFrame
+        df: Polars DataFrame
         
     Returns:
         Tuple of (numeric_columns, categorical_columns)
@@ -16,16 +16,16 @@ def get_data_types(df):
     categorical_columns = []
     
     for column in df.columns:
-        # Check if column is numeric (including if it's an object type that can be converted)
-        try:
-            if pd.api.types.is_numeric_dtype(df[column]):
+        # Check if column is numeric
+        if df.select(pl.col(column)).dtypes[0] in [pl.Int64, pl.Float64]:
+            numeric_columns.append(column)
+        else:
+            # Try to convert to numeric to catch strings that are actually numbers
+            try:
+                df.select(pl.col(column).cast(pl.Float64))
                 numeric_columns.append(column)
-            else:
-                # Try to convert to numeric to catch strings that are actually numbers
-                pd.to_numeric(df[column], errors='raise')
-                numeric_columns.append(column)
-        except:
-            categorical_columns.append(column)
+            except:
+                categorical_columns.append(column)
     
     return numeric_columns, categorical_columns
 
@@ -34,26 +34,28 @@ def convert_df_to_csv(df):
     Convert DataFrame to CSV for download.
     
     Args:
-        df: Pandas DataFrame
+        df: Polars DataFrame
         
     Returns:
         CSV string
     """
-    return df.to_csv(index=False).encode('utf-8')
+    return df.write_csv().encode('utf-8')
 
 def convert_df_to_excel(df):
     """
     Convert DataFrame to Excel for download.
     
     Args:
-        df: Pandas DataFrame
+        df: Polars DataFrame
         
     Returns:
         Excel bytes object
     """
+    # Convert to pandas for Excel export
+    df_pd = df.to_pandas()
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Data')
+        df_pd.to_excel(writer, index=False, sheet_name='Data')
     
     output.seek(0)
     return output.getvalue()
@@ -66,7 +68,7 @@ def generate_sample_data(rows=100):
         rows: Number of rows to generate
         
     Returns:
-        Pandas DataFrame with sample data
+        Polars DataFrame with sample data
     """
     np.random.seed(42)
     
@@ -88,6 +90,6 @@ def generate_sample_data(rows=100):
         data[col] = [None if mask[i] else data[col][i] for i in range(rows)]
     
     # Create DataFrame
-    df = pd.DataFrame(data)
+    df = pl.DataFrame(data)
     
     return df

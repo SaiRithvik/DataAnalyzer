@@ -1,4 +1,4 @@
-import pandas as pd
+import polars as pl
 import json
 from openai import OpenAI
 
@@ -7,7 +7,7 @@ def analyze_dataset_with_gpt(df, api_key, max_rows=100, max_cols=20):
     Analyze a dataset using OpenAI's GPT-4o-mini model.
     
     Args:
-        df: Pandas DataFrame
+        df: Polars DataFrame
         api_key: OpenAI API key
         max_rows: Maximum rows to send to the API
         max_cols: Maximum columns to send to the API
@@ -17,30 +17,42 @@ def analyze_dataset_with_gpt(df, api_key, max_rows=100, max_cols=20):
     """
     # Limit dataset size for API request
     sample_df = df
-    if len(df) > max_rows:
-        sample_df = df.sample(max_rows, random_state=42)
+    if df.height > max_rows:
+        sample_df = df.sample(n=max_rows, seed=42)
     
     # Limit columns if too many
-    if len(df.columns) > max_cols:
-        sample_df = sample_df.iloc[:, :max_cols]
-    #
+    if df.width > max_cols:
+        sample_df = sample_df.select(df.columns[:max_cols])
+    
     # Get basic stats
-    numeric_cols = sample_df.select_dtypes(include=['number']).columns.tolist()
+    numeric_cols = [col for col in df.columns if df.select(pl.col(col)).dtypes[0] in [pl.Int64, pl.Float64]]
     stats = {}
     if numeric_cols:
-        stats = sample_df[numeric_cols].describe().to_dict()
+        stats = {
+            col: {
+                'count': sample_df.select(pl.col(col).count()).item(),
+                'mean': sample_df.select(pl.col(col).mean()).item(),
+                'std': sample_df.select(pl.col(col).std()).item(),
+                'min': sample_df.select(pl.col(col).min()).item(),
+                '25%': sample_df.select(pl.col(col).quantile(0.25)).item(),
+                '50%': sample_df.select(pl.col(col).median()).item(),
+                '75%': sample_df.select(pl.col(col).quantile(0.75)).item(),
+                'max': sample_df.select(pl.col(col).max()).item()
+            }
+            for col in numeric_cols
+        }
     
     # Convert sample to records for analysis
-    sample_records = sample_df.head(10).to_dict(orient='records')
+    sample_records = sample_df.head(10).to_dicts()
     
     # Prepare dataset info
     dataset_info = {
-        "columns": sample_df.columns.tolist(),
-        "shape": df.shape,
-        "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
+        "columns": df.columns,
+        "shape": (df.height, df.width),
+        "dtypes": {col: str(dtype) for col, dtype in zip(df.columns, df.dtypes)},
         "sample_data": sample_records,
         "basic_stats": stats,
-        "missing_values": df.isnull().sum().to_dict()
+        "missing_values": {col: df.select(pl.col(col).null_count()).item() for col in df.columns}
     }
     
     # Create the prompt for GPT
