@@ -68,34 +68,80 @@ if files:
         file_path = os.path.join(UPLOAD_DIR, selected_file)
         st.write(f"Selected file: {file_path}")
         try:
-            # Read the file
+            # Debug: Print file size
+            file_size = os.path.getsize(file_path) / (1024 * 1024)  # Convert to MB
+            st.write(f"File size: {file_size:.2f} MB")
+            
+            # Read the file with explicit index handling
             if selected_file.endswith('.csv'):
-                df = pd.read_csv(file_path)
+                st.write("Reading CSV file...")
+                df = pd.read_csv(file_path, index_col=None)
             elif selected_file.endswith(('.xlsx', '.xls')):
-                df = pd.read_excel(file_path)
+                st.write("Reading Excel file...")
+                df = pd.read_excel(file_path, index_col=None)
             else:
                 st.error("Unsupported file format. Please upload a CSV or Excel file.")
                 df = None
+
             if df is not None:
-                def convert_object_columns(df):
-                    # Convert all object columns to string type
-                    for col in df.select_dtypes(include=['object']).columns:
-                        df[col] = df[col].astype(str)
-                    return df
-
-                # Apply the conversion to all object columns
-                df = convert_object_columns(df)
-
+                # Debug: Print initial DataFrame info
+                st.write("Initial DataFrame Info:")
+                st.write(f"Shape: {df.shape}")
+                st.write("Columns and their types:")
+                for col in df.columns:
+                    st.write(f"Column: {col}, Type: {df[col].dtype}")
+                    # Print sample values for object columns
+                    if df[col].dtype == 'object':
+                        st.write(f"Sample values for {col}:")
+                        st.write(df[col].head().tolist())
+                
+                # Reset index to ensure no problematic index
+                df = df.reset_index(drop=True)
+                
+                # Convert all object columns to string
+                st.write("\nConverting object columns to string...")
+                for col in df.select_dtypes(include=['object']).columns:
+                    st.write(f"Converting column: {col}")
+                    try:
+                        # Print unique values before conversion
+                        st.write(f"Unique values in {col} before conversion:")
+                        st.write(df[col].unique()[:5])  # Show first 5 unique values
+                        
+                        df[col] = df[col].fillna('').astype(str)
+                        
+                        # Print unique values after conversion
+                        st.write(f"Unique values in {col} after conversion:")
+                        st.write(df[col].unique()[:5])  # Show first 5 unique values
+                    except Exception as e:
+                        st.error(f"Error converting column {col}: {str(e)}")
+                        st.write(f"Error type: {type(e).__name__}")
+                        st.write(f"Error message: {str(e)}")
+                
                 # Store in session state
                 st.session_state.df = df
                 st.session_state.file_name = selected_file
+                
                 # Get column types
                 numeric_cols, categorical_cols = get_data_types(df)
                 st.session_state.numeric_columns = numeric_cols
                 st.session_state.categorical_columns = categorical_cols
+                
                 st.success(f"Successfully loaded {selected_file} with {df.shape[0]} rows and {df.shape[1]} columns.")
+                
+                # Final DataFrame info
+                st.write("\nFinal DataFrame Info:")
+                st.write("Data Types:")
+                st.write(df.dtypes)
+                
         except Exception as e:
             st.error(f"Error loading the file: {str(e)}")
+            st.write("Detailed error information:")
+            st.write(f"Error type: {type(e).__name__}")
+            st.write(f"Error message: {str(e)}")
+            # Print the full traceback
+            import traceback
+            st.write("Full traceback:")
+            st.write(traceback.format_exc())
 else:
     st.write("No files found in the 'uploads' directory.")
 
