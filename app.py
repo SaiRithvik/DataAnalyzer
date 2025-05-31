@@ -75,27 +75,40 @@ if files:
             # Read the file with explicit index handling
             if selected_file.endswith('.csv'):
                 st.write("Reading CSV file...")
-                df = pd.read_csv(file_path, index_col=None, low_memory=False)
+                # Read in chunks
+                chunk_size = 10000  # Adjust this value based on your needs
+                chunks = pd.read_csv(file_path, chunksize=chunk_size, low_memory=False)
+                
+                # Process first chunk to get column information
+                first_chunk = next(chunks)
+                df = first_chunk
+                
+                # Convert object columns to string in the first chunk
+                for col in df.select_dtypes(include=['object']).columns:
+                    df[col] = df[col].fillna('').astype(str)
+                
+                # Store in session state
+                st.session_state.df = df
+                st.session_state.file_name = selected_file
+                st.session_state.chunks = chunks  # Store the chunk iterator
+                
+                # Get column types
+                numeric_cols, categorical_cols = get_data_types(df)
+                st.session_state.numeric_columns = numeric_cols
+                st.session_state.categorical_columns = categorical_cols
+                
+                st.success(f"Successfully loaded first chunk of {selected_file}")
+                
+                # Display the dataframe using the safe display function
+                safe_display_dataframe(df)
+                
             elif selected_file.endswith(('.xlsx', '.xls')):
                 st.write("Reading Excel file...")
                 df = pd.read_excel(file_path, index_col=None)
-            else:
-                st.error("Unsupported file format. Please upload a CSV or Excel file.")
-                df = None
-
-            if df is not None:
-                # Reset index
-                df = df.reset_index(drop=True)
                 
-                # Convert all object columns to string
-                st.write("\nConverting object columns to string...")
+                # Convert object columns to string
                 for col in df.select_dtypes(include=['object']).columns:
-                    try:
-                        df[col] = df[col].fillna('').astype(str)
-                    except Exception as e:
-                        st.error(f"Error converting column {col}: {str(e)}")
-                        # Drop problematic column
-                        df = df.drop(columns=[col])
+                    df[col] = df[col].fillna('').astype(str)
                 
                 # Store in session state
                 st.session_state.df = df
@@ -106,10 +119,12 @@ if files:
                 st.session_state.numeric_columns = numeric_cols
                 st.session_state.categorical_columns = categorical_cols
                 
-                st.success(f"Successfully loaded {selected_file} with {df.shape[0]} rows and {df.shape[1]} columns.")
+                st.success(f"Successfully loaded {selected_file}")
                 
                 # Display the dataframe using the safe display function
                 safe_display_dataframe(df)
+            else:
+                st.error("Unsupported file format. Please upload a CSV or Excel file.")
                 
         except Exception as e:
             st.error(f"Error loading the file: {str(e)}")
@@ -132,18 +147,41 @@ def safe_display_dataframe(df):
         st.write(f"Shape: {display_df.shape}")
         st.write("Columns:", display_df.columns.tolist())
         
-        # Try to display using st.table instead of st.dataframe
-        st.table(display_df.head())
+        # Display data in chunks
+        chunk_size = 1000  # Adjust this value based on your needs
+        total_rows = len(display_df)
         
-        # If that works, try to display the full dataframe
-        if st.checkbox("Show full dataframe"):
-            st.table(display_df)
-            
+        # Add a slider to control which chunk to display
+        chunk_number = st.slider(
+            "Select data chunk",
+            min_value=0,
+            max_value=total_rows // chunk_size,
+            value=0,
+            help=f"Each chunk contains {chunk_size} rows"
+        )
+        
+        start_idx = chunk_number * chunk_size
+        end_idx = min((chunk_number + 1) * chunk_size, total_rows)
+        
+        # Display the selected chunk
+        st.write(f"Displaying rows {start_idx} to {end_idx}")
+        chunk_df = display_df.iloc[start_idx:end_idx]
+        
+        # Convert to HTML and display
+        st.write(chunk_df.to_html(), unsafe_allow_html=True)
+        
+        # Add download button for the current chunk
+        csv = chunk_df.to_csv(index=False)
+        st.download_button(
+            label="Download current chunk as CSV",
+            data=csv,
+            file_name=f"chunk_{chunk_number}.csv",
+            mime="text/csv"
+        )
+        
     except Exception as e:
         st.error(f"Error displaying dataframe: {str(e)}")
-        # Fallback: display as HTML
-        st.write("Displaying as HTML:")
-        st.write(display_df.head().to_html(), unsafe_allow_html=True)
+        st.write("Error details:", str(e))
 
 # Show analysis options only if data is loaded
 if st.session_state.df is not None:
