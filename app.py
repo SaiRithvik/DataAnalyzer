@@ -77,6 +77,15 @@ if files:
                 st.error("Unsupported file format. Please upload a CSV or Excel file.")
                 df = None
             if df is not None:
+                def convert_object_columns(df):
+                    # Convert all object columns to string type
+                    for col in df.select_dtypes(include=['object']).columns:
+                        df[col] = df[col].astype(str)
+                    return df
+
+                # Apply the conversion to all object columns
+                df = convert_object_columns(df)
+
                 # Store in session state
                 st.session_state.df = df
                 st.session_state.file_name = selected_file
@@ -85,15 +94,6 @@ if files:
                 st.session_state.numeric_columns = numeric_cols
                 st.session_state.categorical_columns = categorical_cols
                 st.success(f"Successfully loaded {selected_file} with {df.shape[0]} rows and {df.shape[1]} columns.")
-
-                def convert_object_column(df, column_name):
-                    # Convert the column to a string type
-                    df[column_name] = df[column_name].astype(str)
-                    return df
-
-                # Apply the conversion to the problematic column
-                if 'Data Type' in df.columns:
-                    df = convert_object_column(df, 'Data Type')
         except Exception as e:
             st.error(f"Error loading the file: {str(e)}")
 else:
