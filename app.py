@@ -1,5 +1,5 @@
 import streamlit as st
-import polars as pl
+import pandas as pd
 import numpy as np
 from io import BytesIO
 import plotly.express as px
@@ -63,9 +63,9 @@ if uploaded_file is not None:
         
         # Read the file
         if file_extension.lower() == 'csv':
-            df = pl.read_csv(uploaded_file)
+            df = pd.read_csv(uploaded_file)
         elif file_extension.lower() in ['xlsx', 'xls']:
-            df = pl.read_excel(uploaded_file)
+            df = pd.read_excel(uploaded_file)
         
         # Store in session state
         st.session_state.df = df
@@ -76,7 +76,7 @@ if uploaded_file is not None:
         st.session_state.numeric_columns = numeric_cols
         st.session_state.categorical_columns = categorical_cols
         
-        st.success(f"Successfully loaded {uploaded_file.name} with {df.height} rows and {df.width} columns.")
+        st.success(f"Successfully loaded {uploaded_file.name} with {df.shape[0]} rows and {df.shape[1]} columns.")
     except Exception as e:
         st.error(f"Error loading the file: {str(e)}")
 
@@ -93,7 +93,7 @@ if st.session_state.df is not None:
         st.header("Data Preview")
         
         # Display data sample
-        sample_size = st.slider("Number of rows to display", min_value=5, max_value=min(100, df.height), value=10)
+        sample_size = st.slider("Number of rows to display", min_value=5, max_value=min(100, df.shape[0]), value=10)
         st.dataframe(df.head(sample_size))
         
         # Data filtering
@@ -103,17 +103,17 @@ if st.session_state.df is not None:
         selected_columns = st.multiselect("Select columns to display", df.columns, default=df.columns[:5])
         
         if selected_columns:
-            filtered_df = df.select(selected_columns)
+            filtered_df = df.loc[:, selected_columns]
             
             # Filter by value (only for categorical columns that are selected)
             categorical_filter_cols = [col for col in selected_columns if col in categorical_columns]
             if categorical_filter_cols:
                 filter_column = st.selectbox("Filter by categorical column", categorical_filter_cols)
-                unique_values = df.select(pl.col(filter_column)).unique().to_series().to_list()
+                unique_values = df[filter_column].unique()
                 filter_values = st.multiselect("Select values", unique_values, default=unique_values[:5])
                 
                 if filter_values:
-                    filtered_df = filtered_df.filter(pl.col(filter_column).is_in(filter_values))
+                    filtered_df = filtered_df[filtered_df[filter_column].isin(filter_values)]
             
             # Sorting
             sort_column = st.selectbox("Sort by", ["None"] + selected_columns)
@@ -121,7 +121,7 @@ if st.session_state.df is not None:
             if sort_column != "None":
                 sort_order = st.radio("Sort order", ["Ascending", "Descending"])
                 ascending = sort_order == "Ascending"
-                filtered_df = filtered_df.sort(sort_column, descending=not ascending)
+                filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending)
             
             st.subheader("Filtered Data")
             st.dataframe(filtered_df)
@@ -131,9 +131,9 @@ if st.session_state.df is not None:
         
         # Show data types
         st.subheader("Data Types")
-        dtypes_df = pl.DataFrame({
+        dtypes_df = pd.DataFrame({
             "Column": df.columns,
-            "Data Type": [str(dtype) for dtype in df.dtypes]
+            "Data Type": df.dtypes.apply(lambda x: x.name)
         })
         st.dataframe(dtypes_df)
         
@@ -149,7 +149,7 @@ if st.session_state.df is not None:
         if categorical_columns:
             st.subheader("Categorical Columns Value Counts")
             cat_col = st.selectbox("Select a categorical column", categorical_columns)
-            value_counts = df.select(pl.col(cat_col)).value_counts()
+            value_counts = df[cat_col].value_counts()
             st.dataframe(value_counts)
         else:
             st.info("No categorical columns found in the dataset.")

@@ -2,14 +2,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.figure_factory as ff
 import numpy as np
-import polars as pl
+import pandas as pd
 
 def plot_histogram(df, column, bins=20, highlight_outliers=False, outlier_indices=None):
     """
     Create a histogram for a numeric column.
     
     Args:
-        df: Polars DataFrame
+        df: Pandas DataFrame
         column: Column name to plot
         bins: Number of bins
         highlight_outliers: Whether to highlight outliers
@@ -18,11 +18,8 @@ def plot_histogram(df, column, bins=20, highlight_outliers=False, outlier_indice
     Returns:
         Plotly figure object
     """
-    # Convert to pandas for plotly express
-    df_pd = df.to_pandas()
-    
     fig = px.histogram(
-        df_pd, 
+        df, 
         x=column,
         nbins=bins,
         title=f"Histogram of {column}",
@@ -32,7 +29,7 @@ def plot_histogram(df, column, bins=20, highlight_outliers=False, outlier_indice
     )
     
     # Add normal distribution curve
-    data = df.select(pl.col(column)).drop_nulls().to_series()
+    data = df[column].dropna()
     mean = data.mean()
     std = data.std()
     
@@ -51,7 +48,7 @@ def plot_histogram(df, column, bins=20, highlight_outliers=False, outlier_indice
     
     # Highlight outliers if requested
     if highlight_outliers and outlier_indices is not None:
-        outlier_data = df.filter(pl.Series(name="row_nr", values=outlier_indices)).select(pl.col(column)).drop_nulls().to_series()
+        outlier_data = df.loc[outlier_indices, column].dropna()
         
         fig.add_trace(
             go.Histogram(
@@ -77,7 +74,7 @@ def plot_box_plot(df, columns, highlight_outliers=False, outlier_indices=None):
     Create a box plot for one or more numeric columns.
     
     Args:
-        df: Polars DataFrame
+        df: Pandas DataFrame
         columns: List of column names to plot
         highlight_outliers: Whether to highlight outliers
         outlier_indices: List of outlier indices
@@ -88,7 +85,7 @@ def plot_box_plot(df, columns, highlight_outliers=False, outlier_indices=None):
     fig = go.Figure()
     
     for column in columns:
-        data = df.select(pl.col(column)).drop_nulls().to_series()
+        data = df[column].dropna()
         
         fig.add_trace(
             go.Box(
@@ -103,7 +100,7 @@ def plot_box_plot(df, columns, highlight_outliers=False, outlier_indices=None):
         
         # Highlight specific outliers if requested
         if highlight_outliers and outlier_indices is not None:
-            outlier_data = df.filter(pl.Series(name="row_nr", values=outlier_indices)).select(pl.col(column)).drop_nulls().to_series()
+            outlier_data = df.loc[outlier_indices, column].dropna()
             
             if len(outlier_data) > 0:
                 fig.add_trace(
@@ -132,17 +129,14 @@ def plot_scatter_matrix(df, columns):
     Create a scatter plot matrix for numeric columns.
     
     Args:
-        df: Polars DataFrame
+        df: Pandas DataFrame
         columns: List of column names to plot
         
     Returns:
         Plotly figure object
     """
-    # Convert to pandas for plotly express
-    df_pd = df.select(columns).to_pandas()
-    
     fig = px.scatter_matrix(
-        df_pd,
+        df,
         dimensions=columns,
         title="Scatter Plot Matrix",
         opacity=0.7
@@ -168,18 +162,18 @@ def plot_correlation_heatmap(df, numeric_columns):
     Create a correlation heatmap for numeric columns.
     
     Args:
-        df: Polars DataFrame
+        df: Pandas DataFrame
         numeric_columns: List of numeric column names
         
     Returns:
         Plotly figure object
     """
     # Calculate correlation matrix
-    corr_matrix = df.select(numeric_columns).corr()
+    corr_matrix = df[numeric_columns].corr()
     
     # Create heatmap
     fig = px.imshow(
-        corr_matrix.to_pandas(),
+        corr_matrix,
         text_auto=True,
         color_continuous_scale='RdBu_r',
         labels=dict(color="Correlation"),
@@ -198,13 +192,13 @@ def plot_missing_data_heatmap(df):
     Create a heatmap of missing data.
     
     Args:
-        df: Polars DataFrame
+        df: Pandas DataFrame
         
     Returns:
         Plotly figure object
     """
     # Create a boolean mask for missing values
-    missing_mask = df.null_count().to_pandas()
+    missing_mask = df.isnull()
     
     fig = px.imshow(
         missing_mask,
@@ -225,18 +219,15 @@ def plot_line_chart(df, x_column, y_columns):
     Create a line chart for one or more numeric columns.
     
     Args:
-        df: Polars DataFrame
+        df: Pandas DataFrame
         x_column: Column name for x-axis
         y_columns: List of column names for y-axis
         
     Returns:
         Plotly figure object
     """
-    # Convert to pandas for plotly express
-    df_pd = df.select([x_column] + y_columns).to_pandas()
-    
     fig = px.line(
-        df_pd,
+        df,
         x=x_column,
         y=y_columns,
         title="Line Chart",
@@ -257,19 +248,16 @@ def plot_bar_chart(df, category_column, value_column=None):
     Create a bar chart.
     
     Args:
-        df: Polars DataFrame
+        df: Pandas DataFrame
         category_column: Column name for categories
         value_column: Column name for values (optional)
         
     Returns:
         Plotly figure object
     """
-    # Convert to pandas for plotly express
-    df_pd = df.select([category_column] + ([value_column] if value_column else [])).to_pandas()
-    
     if value_column:
         fig = px.bar(
-            df_pd,
+            df,
             x=category_column,
             y=value_column,
             title=f"Bar Chart: {value_column} by {category_column}",
@@ -277,7 +265,8 @@ def plot_bar_chart(df, category_column, value_column=None):
         )
     else:
         # Count occurrences if no value column provided
-        value_counts = df.select(pl.col(category_column)).value_counts().to_pandas()
+        value_counts = df[category_column].value_counts().reset_index()
+        value_counts.columns = [category_column, 'counts']
         fig = px.bar(
             value_counts,
             x=category_column,
@@ -299,26 +288,24 @@ def plot_pie_chart(df, category_column, value_column=None):
     Create a pie chart.
     
     Args:
-        df: Polars DataFrame
+        df: Pandas DataFrame
         category_column: Column name for categories
         value_column: Column name for values (optional)
         
     Returns:
         Plotly figure object
     """
-    # Convert to pandas for plotly express
-    df_pd = df.select([category_column] + ([value_column] if value_column else [])).to_pandas()
-    
     if value_column:
         fig = px.pie(
-            df_pd,
+            df,
             names=category_column,
             values=value_column,
             title=f"Pie Chart: {value_column} by {category_column}"
         )
     else:
         # Count occurrences if no value column provided
-        value_counts = df.select(pl.col(category_column)).value_counts().to_pandas()
+        value_counts = df[category_column].value_counts().reset_index()
+        value_counts.columns = [category_column, 'counts']
         fig = px.pie(
             value_counts,
             names=category_column,
