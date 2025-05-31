@@ -67,34 +67,28 @@ if files:
     if selected_file:
         file_path = os.path.join(UPLOAD_DIR, selected_file)
         st.write(f"Selected file: {file_path}")
-        # Use file_path for your analysis
+        try:
+            # Read the file
+            if selected_file.endswith('.csv'):
+                df = pd.read_csv(file_path)
+            elif selected_file.endswith(('.xlsx', '.xls')):
+                df = pd.read_excel(file_path)
+            else:
+                st.error("Unsupported file format. Please upload a CSV or Excel file.")
+                df = None
+            if df is not None:
+                # Store in session state
+                st.session_state.df = df
+                st.session_state.file_name = selected_file
+                # Get column types
+                numeric_cols, categorical_cols = get_data_types(df)
+                st.session_state.numeric_columns = numeric_cols
+                st.session_state.categorical_columns = categorical_cols
+                st.success(f"Successfully loaded {selected_file} with {df.shape[0]} rows and {df.shape[1]} columns.")
+        except Exception as e:
+            st.error(f"Error loading the file: {str(e)}")
 else:
     st.write("No files found in the 'uploads' directory.")
-
-# Process the uploaded file
-if uploaded_file is not None:
-    try:
-        # Get file extension
-        file_extension = uploaded_file.name.split('.')[-1]
-        
-        # Read the file
-        if file_extension.lower() == 'csv':
-            df = pd.read_csv(uploaded_file)
-        elif file_extension.lower() in ['xlsx', 'xls']:
-            df = pd.read_excel(uploaded_file)
-        
-        # Store in session state
-        st.session_state.df = df
-        st.session_state.file_name = uploaded_file.name
-        
-        # Get column types
-        numeric_cols, categorical_cols = get_data_types(df)
-        st.session_state.numeric_columns = numeric_cols
-        st.session_state.categorical_columns = categorical_cols
-        
-        st.success(f"Successfully loaded {uploaded_file.name} with {df.shape[0]} rows and {df.shape[1]} columns.")
-    except Exception as e:
-        st.error(f"Error loading the file: {str(e)}")
 
 # Show analysis options only if data is loaded
 if st.session_state.df is not None:
