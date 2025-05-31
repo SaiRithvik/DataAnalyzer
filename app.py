@@ -99,6 +99,20 @@ if files:
 else:
     st.write("No files found in the 'uploads' directory.")
 
+def safe_display_dataframe(df):
+    try:
+        # First try to convert all object columns to string
+        for col in df.select_dtypes(include=['object']).columns:
+            df[col] = df[col].fillna('').astype(str)
+        
+        # Try to display with use_container_width=True
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.error(f"Error displaying dataframe: {str(e)}")
+        # Fallback: display only the first few rows
+        st.write("Displaying first 5 rows of the data:")
+        st.write(df.head())
+
 # Show analysis options only if data is loaded
 if st.session_state.df is not None:
     df = st.session_state.df
@@ -111,9 +125,9 @@ if st.session_state.df is not None:
     with tab1:
         st.header("Data Preview")
         
-        # Display data sample
+        # Display data sample using the safe display function
         sample_size = st.slider("Number of rows to display", min_value=5, max_value=min(100, df.shape[0]), value=10)
-        st.dataframe(df.head(sample_size))
+        safe_display_dataframe(df.head(sample_size))
         
         # Data filtering
         st.subheader("Data Filtering")
