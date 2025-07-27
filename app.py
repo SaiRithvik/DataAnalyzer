@@ -72,7 +72,19 @@ if uploaded_file is not None:
         st.session_state.file_name = uploaded_file.name
         
         # Get column types
-        numeric_cols, categorical_cols = get_data_types(df)
+        numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+        # Exclude boolean columns from the list of numeric columns
+        bool_cols = df.select_dtypes(include=np.bool_).columns.tolist()
+        numeric_cols = [col for col in numeric_cols if col not in bool_cols]
+        
+        categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        
+        # Optionally, you can treat boolean columns as categorical
+        categorical_cols.extend(bool_cols)
+
+
+
+        #numeric_cols, categorical_cols = get_data_types(df)
         st.session_state.numeric_columns = numeric_cols
         st.session_state.categorical_columns = categorical_cols
         
