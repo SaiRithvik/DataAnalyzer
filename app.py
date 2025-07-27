@@ -186,9 +186,32 @@ if st.session_state.df is not None:
                 st.warning("No numeric columns available for histogram.")
             else:
                 col = st.selectbox("Select column for histogram", numeric_columns)
-                bins = st.slider("Number of bins", 5, 100, 20)
-                fig = plot_histogram(df, col, bins)
+
+                # let the user choose which control to expose
+                use_bin_width = st.checkbox("Specify bin width instead of number of bins")
+
+                if use_bin_width:
+                    width = st.number_input("Bin width (data units)", min_value=0.0, value=1.0, step=0.1)
+                    fig = plot_histogram(df, col, bin_width=width)
+                    fig.update_traces(marker=dict(line=dict(color="black", width=1)))  # 1-pixel black outline
+           
+                else:
+                    bins = st.slider("Number of bins", 5, 100, 20)
+                    fig = plot_histogram(df, col, bins=bins)
+                    fig.update_traces(marker=dict(line=dict(color="black", width=1)))  # 1-pixel black outline
+
                 st.plotly_chart(fig, use_container_width=True)
+
+
+
+
+
+
+
+
+
+
+
         
         elif viz_type == "Box Plot":
             if not numeric_columns:

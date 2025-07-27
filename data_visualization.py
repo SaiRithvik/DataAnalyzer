@@ -4,69 +4,72 @@ import plotly.figure_factory as ff
 import numpy as np
 import pandas as pd
 
-def plot_histogram(df, column, bins=20, highlight_outliers=False, outlier_indices=None):
+def plot_histogram(
+        df,
+        column,
+        *,
+        bins=20,
+        bin_width=None,          # NEW: explicit width (data units)
+        highlight_outliers=False,
+        outlier_indices=None):
     """
-    Create a histogram for a numeric column.
-    
-    Args:
-        df: Pandas DataFrame
-        column: Column name to plot
-        bins: Number of bins
-        highlight_outliers: Whether to highlight outliers
-        outlier_indices: List of outlier indices
-        
-    Returns:
-        Plotly figure object
+    Create a histogram for a numeric column. Either
+    • bins (approx. number of bars) or
+    • bin_width (exact bar width) may be provided.
     """
+    # base histogram
     fig = px.histogram(
-        df, 
+        df,
         x=column,
         nbins=bins,
         title=f"Histogram of {column}",
         labels={column: column},
         opacity=0.7,
-        marginal="box"  # add a box plot at the margin
+        marginal="box"
     )
-    
-    # Add normal distribution curve
+
+    # if caller gave a width, override Plotly’s binning
+    if bin_width is not None:
+        for t in fig.data:
+            if isinstance(t, go.Histogram):
+                t.xbins = dict(size=bin_width)
+
+    # normal-distribution curve
     data = df[column].dropna()
-    mean = data.mean()
-    std = data.std()
-    
+    mean, std = data.mean(), data.std()
     x = np.linspace(data.min(), data.max(), 100)
-    y = ((1 / (np.sqrt(2 * np.pi) * std)) * np.exp(-0.5 * ((x - mean) / std) ** 2)) * len(data) * (data.max() - data.min()) / bins
-    
+    y = ((1 / (np.sqrt(2 * np.pi) * std))
+         * np.exp(-0.5 * ((x - mean) / std) ** 2)
+         * len(data) * (data.max() - data.min()) / (bin_width or bins))
     fig.add_trace(
         go.Scatter(
-            x=x, 
-            y=y, 
-            mode='lines', 
-            name='Normal Distribution',
-            line=dict(color='red', width=2)
+            x=x,
+            y=y,
+            mode="lines",
+            name="Normal Distribution",
+            line=dict(color="red", width=2)
         )
     )
-    
-    # Highlight outliers if requested
+
+    # optional outlier overlay
     if highlight_outliers and outlier_indices is not None:
         outlier_data = df.loc[outlier_indices, column].dropna()
-        
         fig.add_trace(
             go.Histogram(
                 x=outlier_data,
                 nbinsx=bins,
-                name='Outliers',
-                marker_color='red',
+                name="Outliers",
+                marker_color="red",
                 opacity=0.7
             )
         )
-    
+
     fig.update_layout(
         xaxis_title=column,
         yaxis_title="Frequency",
         legend_title="Legend",
-        barmode='overlay'
+        barmode="overlay"
     )
-    
     return fig
 
 def plot_box_plot(df, columns, highlight_outliers=False, outlier_indices=None):
